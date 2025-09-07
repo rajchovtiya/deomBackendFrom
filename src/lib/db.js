@@ -20,24 +20,24 @@ import mongoose from "mongoose";
 const MONGODB_URI = process.env.MONGODB_URI;
 
 if (!MONGODB_URI) {
-    throw new Error("Please define the MONGODB_URI environment variable in Vercel");
+    throw new Error("⚠️ Please define MONGODB_URI in environment variables");
 }
 
-let isConnected = false;
+let cached = global.mongoose;
+
+if (!cached) {
+    cached = global.mongoose = { conn: null, promise: null };
+}
 
 export default async function dbConnect() {
-    if (isConnected) return;
+    if (cached.conn) return cached.conn;
 
-    try {
-        const db = await mongoose.connect(MONGODB_URI, {
-            useNewUrlParser: true,
-            useUnifiedTopology: true,
-        });
-
-        isConnected = db.connections[0].readyState === 1;
-        console.log("✅ MongoDB connected");
-    } catch (err) {
-        console.error("❌ MongoDB connection error:", err);
-        throw err;
+    if (!cached.promise) {
+        cached.promise = mongoose.connect(MONGODB_URI, {
+            bufferCommands: false,
+        }).then((mongoose) => mongoose);
     }
+
+    cached.conn = await cached.promise;
+    return cached.conn;
 }
